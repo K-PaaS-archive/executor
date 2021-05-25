@@ -156,9 +156,11 @@ var (
 	metricsWorkPool, readWorkPool      *workpool.WorkPool
 )
 
+// Added for PaaS-TA
 func Initialize(logger lager.Logger, config ExecutorConfig, cellID, zone string,
 	rootFSes map[string]string, metronClient loggingclient.IngressClient,
-	clock clock.Clock) (executor.Client, *containermetrics.StatsReporter, grouper.Members, error) {
+	//clock clock.Clock) (executor.Client, *containermetrics.StatsReporter, grouper.Members, error) {
+	clock clock.Clock) (executor.Client, *containermetrics.StatsReporter, grouper.Members, GardenClient.Client, error) {
 
 	var gardenHealthcheckRootFS string
 	for _, rootFSPath := range rootFSes {
@@ -169,13 +171,17 @@ func Initialize(logger lager.Logger, config ExecutorConfig, cellID, zone string,
 	postSetupHook, err := shlex.Split(config.PostSetupHook)
 	if err != nil {
 		logger.Error("failed-to-parse-post-setup-hook", err)
-		return nil, nil, grouper.Members{}, err
+		// Added for PaaS-TA
+		//return nil, nil, grouper.Members{}, err
+		return nil, nil, grouper.Members{}, nil, err
 	}
 
 	gardenClient := GardenClient.New(GardenConnection.New(config.GardenNetwork, config.GardenAddr))
 	err = waitForGarden(logger, gardenClient, metronClient, clock)
 	if err != nil {
-		return nil, nil, nil, err
+		// Added for PaaS-TA
+		//return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	containersFetcher := &executorContainers{
@@ -185,35 +191,49 @@ func Initialize(logger lager.Logger, config ExecutorConfig, cellID, zone string,
 
 	creationWorkPool, err = workpool.NewWorkPool(config.CreateWorkPoolSize)
 	if err != nil {
-		return nil, nil, nil, err
+		// Added for PaaS-TA
+		//return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	deletionWorkPool, err = workpool.NewWorkPool(config.DeleteWorkPoolSize)
 	if err != nil {
-		return nil, nil, nil, err
+		// Added for PaaS-TA
+		//return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	readWorkPool, err = workpool.NewWorkPool(config.ReadWorkPoolSize)
 	if err != nil {
-		return nil, nil, nil, err
+		// Added for PaaS-TA
+		//return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	metricsWorkPool, err = workpool.NewWorkPool(config.MetricsWorkPoolSize)
 	if err != nil {
-		return nil, nil, nil, err
+		// Added for PaaS-TA
+		//return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	err = destroyContainers(gardenClient, containersFetcher, logger)
 	if err != nil {
-		return nil, nil, nil, err
+		// Added for PaaS-TA
+		//return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	healthCheckWorkPool, err := workpool.NewWorkPool(config.HealthCheckWorkPoolSize)
 	if err != nil {
-		return nil, nil, grouper.Members{}, err
+		// Added for PaaS-TA
+		//return nil, nil, grouper.Members{}, err
+		return nil, nil, grouper.Members{}, nil, err
 	}
 
 	certsRetriever := systemcertsRetriever{}
 	assetTLSConfig, err := TLSConfigFromConfig(logger, certsRetriever, config)
 	if err != nil {
-		return nil, nil, grouper.Members{}, err
+		// Added for PaaS-TA
+		//return nil, nil, grouper.Members{}, err
+		return nil, nil, grouper.Members{}, nil, err
 	}
 
 	downloader := cacheddownloader.NewDownloader(10*time.Minute, int(math.MaxInt8), assetTLSConfig)
@@ -228,7 +248,9 @@ func Initialize(logger lager.Logger, config ExecutorConfig, cellID, zone string,
 
 	err = cachedDownloader.RecoverState(logger.Session("downloader"))
 	if err != nil {
-		return nil, nil, grouper.Members{}, err
+		// Added for PaaS-TA
+		//return nil, nil, grouper.Members{}, err
+		return nil, nil, grouper.Members{}, nil, err
 	}
 
 	downloadRateLimiter := make(chan struct{}, uint(config.MaxConcurrentDownloads))
@@ -256,11 +278,15 @@ func Initialize(logger lager.Logger, config ExecutorConfig, cellID, zone string,
 
 	totalCapacity, err := fetchCapacity(logger, gardenClient, config)
 	if err != nil {
-		return nil, nil, grouper.Members{}, err
+		// Added for PaaS-TA
+		//return nil, nil, grouper.Members{}, err
+		return nil, nil, grouper.Members{}, nil, err
 	}
 	rootFSSizer, err := configuration.GetRootFSSizes(logger, gardenClient, guidgen.DefaultGenerator, config.ContainerOwnerName, rootFSes)
 	if err != nil {
-		return nil, nil, grouper.Members{}, err
+		// Added for PaaS-TA
+		//return nil, nil, grouper.Members{}, err
+		return nil, nil, grouper.Members{}, nil, err
 	}
 
 	containerConfig := containerstore.ContainerConfig{
@@ -302,7 +328,9 @@ func Initialize(logger lager.Logger, config ExecutorConfig, cellID, zone string,
 
 	credManager, err := CredManagerFromConfig(logger, metronClient, config, clock, proxyConfigHandler, instanceIdentityHandler)
 	if err != nil {
-		return nil, nil, grouper.Members{}, err
+		// Added for PaaS-TA
+		//return nil, nil, grouper.Members{}, err
+		return nil, nil, grouper.Members{}, nil, err
 	}
 
 	containerStore := containerstore.New(
@@ -399,6 +427,8 @@ func Initialize(logger lager.Logger, config ExecutorConfig, cellID, zone string,
 			{"registry-pruner", containerStore.NewRegistryPruner(logger)},
 			{"container-reaper", containerStore.NewContainerReaper(logger)},
 		},
+		// Adde for PaaS-TA
+		gardenClient,
 		nil
 }
 
